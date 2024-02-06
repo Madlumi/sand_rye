@@ -1,6 +1,6 @@
 linux:
 	-mkdir out
-	gcc src/* `sdl2-config --cflags --libs ` -lSDL2_image -o i
+	gcc src/main.c `sdl2-config --cflags --libs ` -lSDL2_image -o i
 run: linux
 	./i
 wasm:

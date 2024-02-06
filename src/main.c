@@ -10,6 +10,7 @@
 #include "Colours.c"
 
 #define IN(x,l,h) ((l)<=(x)&&(x)<=(h))
+#include<unistd.h>
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -23,9 +24,16 @@ int t = 0;
 bool KEYS[keyn];
 SDL_Point mpos = {0,0};
 int MKEYS[mkeyn];
-int sand[h][w];
-int timesteps=4;
-
+int sand[2][h][w];
+int timesteps=5;
+int st=0;
+int stN=1;
+void step(){
+   int t =st;
+   st = stN;
+   stN= t;
+}
+void render();
 
 void quit(){ SDL_Quit(); printf("quiting\n"); running=0; }
 
@@ -45,54 +53,62 @@ void events(){
    }
 }
    int linedir=-1;
-
 int mcol=0;
-void tick(){
+void paint(){
    mcol=(mcol+2) % 255;
    int radius = 20;
 
    int centerX = mpos.x;
    int centerY = mpos.y;
 
-      for (int y = centerY - radius; y <= centerY + radius; y++) {
-         for (int x = centerX - radius; x <= centerX + radius; x++) {
-            // Calculate the distance from the center of the disk (mpos) to the current point (x, y)
-            int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
+   for (int y = centerY - radius; y <= centerY + radius; y++) {
+      for (int x = centerX - radius; x <= centerX + radius; x++) {
+         // Calculate the distance from the center of the disk (mpos) to the current point (x, y)
+         int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
 
-            // Check if the current point is within the radius of the disk
-            if (distanceSquared <= radius * radius) {
-               // Make sure the current point is within the bounds of the sand array
-               if (x >= 0 && x < w&& y >= 0 && y < h) {
-               if(MKEYS[1]>0){ sand[y][x] = hsv_to_int(HsvToRgb(mcol,255,255)); }
+         // Check if the current point is within the radius of the disk
+         if (distanceSquared <= radius * radius) {
+            // Make sure the current point is within the bounds of the sand array
+            if (x >= 0 && x < w&& y >= 0 && y < h) {
+               if(MKEYS[1]>0){ sand[st][y][x] = hsv_to_int(HsvToRgb(mcol,255,255)); }
                if(MKEYS[3]>0){
-                  sand[y][x] = 0; // Set the color to RED
+                  sand[st][y][x] = 0; // Set the color to RED
                }
             }
          }
       }
    }
-   linedir*=-1;
-   for(int yy = h-1; yy >= 0; yy--) {
-      for(int x = 0; x < w; x++) {
-         int xx= x;
-         int falldir = rand() % 2; if(falldir==0){falldir=-1;}
-         if(linedir==1){xx=w-x;}
-         if (sand[yy][xx]!=0){
-            if(sand[yy+1][xx]==0){
-               sand[yy+1][xx]=sand[yy][xx];
-               sand[yy][xx]=0;
-            }else if(sand[yy+1][xx+falldir]==0){
-               sand[yy+1][xx+falldir]=sand[yy][xx];
-               sand[yy][xx]=0;
-            }else if(sand[yy+1][xx-falldir]==0){
-               sand[yy+1][xx-falldir]=sand[yy][xx];
-               sand[yy][xx]=0;
-            } 
+}
+void sandFall(){
+   int falldir = t % 2;
+   int x;
+   if(falldir==0){falldir=-1;}
+   for(int y = h-2; y >= 0; y--){
+      for(int xx = 0; xx < w ;xx++){
+         if (falldir == -1 ){x=(w-xx);}else{ x=xx;};
+         if(sand[st][y][x]!=0){
+            if(sand[st][y+1][x]==0){
+               sand[st][y+1][x]=sand[st][y][x];
+               sand[st][y][x]=0;
+            }else {
+               if(sand[st][y+1][x+falldir]==0){
+                  sand[st][y+1][x+falldir]=sand[st][y][x];
+                  sand[st][y][x]=0;
+               }else{
+                  sand[st][y][x]=sand[st][y][x];
+               }
+            }
+         }else {
+            sand[st][y][x]=0;
 
          }
       }
-
    }
+}
+void tick(){
+   t+=1;
+   if(MKEYS[1] || MKEYS[3]){paint();}
+   sandFall();
 }
 void render(){
    if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
@@ -100,10 +116,10 @@ void render(){
 
    for(int yy = 0; yy < h; yy++) {
       for(int xx = 0; xx < w; xx++) {
-         pixels[(xx + yy * w) * 4 + 0] = sand[yy][xx] & 0xFF;         // Set blue component
-         pixels[(xx + yy * w) * 4 + 1] = (sand[yy][xx] >> 8) & 0xFF;  // Set green component
-         pixels[(xx + yy * w) * 4 + 2] = (sand[yy][xx] >> 16) & 0xFF; // Set red component
-         pixels[(xx + yy * w) * 4 + 3] = (sand[yy][xx] >> 24) & 0xFF; // Set alpha component
+         pixels[(xx + yy * w) * 4 + 0] = sand[st][yy][xx] & 0xFF;         // Set blue component
+         pixels[(xx + yy * w) * 4 + 1] = (sand[st][yy][xx] >> 8) & 0xFF;  // Set green component
+         pixels[(xx + yy * w) * 4 + 2] = (sand[st][yy][xx] >> 16) & 0xFF; // Set red component
+         pixels[(xx + yy * w) * 4 + 3] = (sand[st][yy][xx] >> 24) & 0xFF; // Set alpha component
       }
    }
    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
@@ -117,11 +133,10 @@ void render(){
 }
 void mainLoop(){
    for(int i = 0; i < timesteps; i++){
-   events();
-   tick();
+      events();
+      tick();
    }
    render();
-   t++;
 }
 int main(int argc, char* argv[]) {
    SDL_Init(SDL_INIT_VIDEO);
@@ -132,8 +147,9 @@ int main(int argc, char* argv[]) {
    for(int yy = 0; yy < h; yy++) {
       for(int xx = 0; xx < w; xx++) {
          int i = rand()%30;
-         sand[yy][xx]=0;
-         if(i<.01*yy-1){sand[yy][xx] = hsv_to_int(HsvToRgb(rand()%255,255,255)); } 
+         sand[st][yy][xx]=0;
+         sand[stN][yy][xx]=0;
+         if(i<.01*yy-1){sand[st][yy][xx] = hsv_to_int(HsvToRgb(rand()%255,255,255)); } 
       }
    }
    for(int i = 0; i < 322; i++) { // init them all to false
