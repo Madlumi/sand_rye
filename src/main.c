@@ -1,10 +1,15 @@
+#include "SDL_rect.h"
 #include <SDL.h>
+#include <stdio.h>
 #include <sys/ucontext.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 #include <stdbool.h>
 #include <stdlib.h>
+#include "Colours.c"
+
+#define IN(x,l,h) ((l)<=(x)&&(x)<=(h))
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -13,51 +18,80 @@ SDL_Surface *surface;
 #define h 512
 int running=1;
 int t = 0;
-bool KEYS[322];
+#define keyn 512
+#define mkeyn 24
+bool KEYS[keyn];
+SDL_Point mpos = {0,0};
+int MKEYS[mkeyn];
 int sand[h][w];
-void quit(){
-         SDL_Quit();
-         printf("quiting\n");
-         running=0;
-}
-enum colours {
-   NONE=0,
-   RED=0xFFFF0000,
-   BLUE=0xFF0000FF,
-   GREEN=0xFF00FF00,
-};
+int timesteps=4;
+
+
+void quit(){ SDL_Quit(); printf("quiting\n"); running=0; }
+
 void events(){
    SDL_Event e;
-   while (SDL_PollEvent(&e)) {
-      if (e.type==SDL_KEYDOWN){
-         KEYS[e.key.keysym.sym] = true;
-      }else if (e.type == SDL_KEYUP){
-         KEYS[e.key.keysym.sym] = false;
-      }else if (e.type == SDL_QUIT){
-         quit();
-      }
+   SDL_GetMouseState(&mpos.x, &mpos.y);
+   for(int i = 0; i < mkeyn; i++){if(MKEYS[i]>1){MKEYS[i]--;}}
+   while(SDL_PollEvent(&e)) {
+      if (e.type==SDL_KEYDOWN){if(!IN(e.key.keysym.sym,0,keyn-1)){printf("key: %d\n",e.key.keysym.sym);return;}KEYS[e.key.keysym.sym] = 1;}
+      else if (e.type == SDL_KEYUP){if(!IN(e.key.keysym.sym,0,keyn-1)){return;}KEYS[e.key.keysym.sym] = 0;}
+      else if (e.type == SDL_MOUSEBUTTONDOWN){if(!IN(e.button.button,0,mkeyn-1)){printf("key: %d\n",e.button.button);return;}MKEYS[e.button.button]=2;}
+      else if (e.type == SDL_MOUSEBUTTONUP){if(!IN(e.button.button,0,mkeyn-1)){printf("key: %d\n",e.button.button);return;}MKEYS[e.button.button]=0;}
+      else if (e.type == SDL_QUIT){quit();}
    }
    if(KEYS[SDLK_q]) {
       quit();  
    }
 }
+   int linedir=-1;
+
+int mcol=0;
 void tick(){
+   mcol=(mcol+2) % 255;
+   int radius = 20;
+
+   int centerX = mpos.x;
+   int centerY = mpos.y;
+
+      for (int y = centerY - radius; y <= centerY + radius; y++) {
+         for (int x = centerX - radius; x <= centerX + radius; x++) {
+            // Calculate the distance from the center of the disk (mpos) to the current point (x, y)
+            int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
+
+            // Check if the current point is within the radius of the disk
+            if (distanceSquared <= radius * radius) {
+               // Make sure the current point is within the bounds of the sand array
+               if (x >= 0 && x < w&& y >= 0 && y < h) {
+               if(MKEYS[1]>0){ sand[y][x] = hsv_to_int(HsvToRgb(mcol,255,255)); }
+               if(MKEYS[3]>0){
+                  sand[y][x] = 0; // Set the color to RED
+               }
+            }
+         }
+      }
+   }
+   linedir*=-1;
    for(int yy = h-1; yy >= 0; yy--) {
-      for(int xx = 0; xx < w; xx++) {
-         if (sand[yy][xx]!=NONE){
-            if(sand[yy+1][xx]==NONE){
+      for(int x = 0; x < w; x++) {
+         int xx= x;
+         int falldir = rand() % 2; if(falldir==0){falldir=-1;}
+         if(linedir==1){xx=w-x;}
+         if (sand[yy][xx]!=0){
+            if(sand[yy+1][xx]==0){
                sand[yy+1][xx]=sand[yy][xx];
-               sand[yy][xx]=NONE;
-            }else if(sand[yy+1][xx+1]==NONE){
-               sand[yy+1][xx+1]=sand[yy][xx];
-               sand[yy][xx]=NONE;
-            }else if(sand[yy+1][xx-1]==NONE){
-               sand[yy+1][xx-1]=sand[yy][xx];
-               sand[yy][xx]=NONE;
+               sand[yy][xx]=0;
+            }else if(sand[yy+1][xx+falldir]==0){
+               sand[yy+1][xx+falldir]=sand[yy][xx];
+               sand[yy][xx]=0;
+            }else if(sand[yy+1][xx-falldir]==0){
+               sand[yy+1][xx-falldir]=sand[yy][xx];
+               sand[yy][xx]=0;
             } 
 
          }
       }
+
    }
 }
 void render(){
@@ -82,8 +116,10 @@ void render(){
    SDL_DestroyTexture(screenTexture);
 }
 void mainLoop(){
+   for(int i = 0; i < timesteps; i++){
    events();
    tick();
+   }
    render();
    t++;
 }
@@ -95,17 +131,9 @@ int main(int argc, char* argv[]) {
    
    for(int yy = 0; yy < h; yy++) {
       for(int xx = 0; xx < w; xx++) {
-         int i = rand()%10;
-         sand[yy][xx]=NONE;
-         switch (i) {
-            case 1: 
-               sand[yy][xx]=RED;break;
-            case 2: 
-               sand[yy][xx]=BLUE;break;
-            case 3: 
-               sand[yy][xx]=GREEN;break;
-         } 
-            
+         int i = rand()%30;
+         sand[yy][xx]=0;
+         if(i<.01*yy-1){sand[yy][xx] = hsv_to_int(HsvToRgb(rand()%255,255,255)); } 
       }
    }
    for(int i = 0; i < 322; i++) { // init them all to false
@@ -116,7 +144,7 @@ int main(int argc, char* argv[]) {
 #else
    while(running) {        
       mainLoop();
-      SDL_Delay(16);
+      SDL_Delay(8);
    }
 #endif 
 }
