@@ -58,7 +58,7 @@ V cellTick(I c, I falldir){
    })
 }
 
-I decay=1;
+I decay=0;
 V sandTick(){
    if(KEYS[SDLK_1]==2)decay=!decay;
    radius+=mouseWheelMoved*2; mouseWheelMoved=0;

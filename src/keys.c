@@ -37,7 +37,9 @@ void events(){
 
       else if (e.type == SDL_QUIT){ QUIT=1; }
    }
+#ifndef __EMSCRIPTEN__
    if(KEYS[SDLK_q]) { QUIT=1; }
+#endif
 }
 
 void keysInit(){
