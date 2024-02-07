@@ -23,7 +23,7 @@ void quit(){
    running=0;
 }
 
-#define timesteps 7
+#define timesteps 3
 void mainLoop(){
    for(int i = 0; i < timesteps; i++){ tick(); }
    render();
@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
 #else
    while(running) {        
       mainLoop();
-      SDL_Delay(8);
+      SDL_Delay(16);
    }
 #endif 
 }
