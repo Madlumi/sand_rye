@@ -23,7 +23,7 @@ void quit(){
    running=0;
 }
 
-#define timesteps 5
+#define timesteps 7
 void mainLoop(){
    for(int i = 0; i < timesteps; i++){ tick(); }
    render();

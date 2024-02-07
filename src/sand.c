@@ -1,89 +1,115 @@
 #include "renderer.h"
 #include "keys.c"
 #include "tick.c"
+#include <stdlib.h>
 #include <sys/types.h>
+#include "mutil.h"
 
-typedef struct{
-   int colour;
-   double dx;
-   double dy;
-}Cell;
 
-Cell sand[w*h];
-int getCellN(int x, int y){ return x+y*w; }
+typedef struct{ I colour; D mass; D dx; D dy; I m;}Cell;
+Cell *sand[w*h];
+Cell *newCell(I col, D mass, D dx, D dy){ 
 
-int mcol=0;
-void sandRender(Uint8 *pixels){
-   for(int yy = 0; yy < h; yy++) {
-      for(int xx = 0; xx < w; xx++) {
-         pixels[(xx + yy * w) * 4 + 0] =  sand[getCellN(xx,yy)].colour & 0xFF;         // Set blue component
-         pixels[(xx + yy * w) * 4 + 1] = (sand[getCellN(xx,yy)].colour >> 8) & 0xFF;  // Set green component
-         pixels[(xx + yy * w) * 4 + 2] = (sand[getCellN(xx,yy)].colour >> 16) & 0xFF; // Set red component
-         pixels[(xx + yy * w) * 4 + 3] = (sand[getCellN(xx,yy)].colour >> 24) & 0xFF; // Set alpha component
-      }
-   }
+   Cell *c =malloc(sizeof(Cell));
+   c->m=0;
+   c->colour=col;
+   c->mass =mass;
+   c->dx =dx;
+   c->dy =dy;
+   return c; 
 }
-void paint(){
-   mcol=(mcol+2) % 255;
-   int radius = 20;
-   int centerX = mpos.x;
-   int centerY = mpos.y;
+Cell* Wall;
+I gCellN(I x, I y){ 
+   R x+y*w;
+}
+Cell *gCell(I n){
+   //if(x<0 || y<0 ||y>=h || x>=w){ R Wall; }
+   return sand[n];
+}
 
+I empty(Cell *c){if(c->colour==0){return  1;} return  0; }
+ 
+V paint();
+
+V swapCell(I a, I b){
+   Cell *tmp = sand[a];
+    sand[a] = sand[b];
+    sand[b] = tmp;
+}
+CON D SPEED = 1.0/60;
+CON D G = 9.81; I t = 0; I mcol=0;
+I sign(int x) { return (x > 0) - (x < 0); }
+
+#define empt ->colour==0
+#define nempt ->colour!=0
+V cellTick(I c, I falldir){ 
+
+
+   sand[c]->dy+=G*SPEED;
+   int vel =(int)sand[c]->dy;
+   I d = sign(sand[c]->dy);
+   
+   vel *= d;
+   FOR(vel-1,{
+      if(c+(d*(i+1))*w>=w*h){break;}
+      if(sand[c+(d*(i+1))*w]empt){
+         swapCell(c+(d*(i+1))*w,c+(d*i)*w);
+      }eif(sand[falldir+c+(d*(i+1))*w]empt){
+         swapCell(falldir+ c+(d*(i+1))*w,c+(d*i)*w);
+      }eif(sand[-falldir+c+(d*(i+1))*w]empt){
+         swapCell(-falldir+ c+(d*(i+1))*w,c+(d*i)*w);
+      }el{
+        // sand[c+(d*(i+1))*w]->dy+=sand[c+(d*i)*w]->dy;
+         sand[c+(d*i)*w]->dy=sand[c+(d*i+1)*w]->dy;
+         break;
+      }
+   });
+}
+
+V sandTick(){
+  if(MKEYS[1] || MKEYS[3]){paint();}
+  t++;
+  I falldir = t % 2; if(falldir==0){falldir=-1;}
+  I x;
+   
+   FORR(w*(h-1), {
+         if(sand[i]nempt){ cellTick(i,1); }
+   });
+}
+
+V paint(){
+   mcol=(mcol+2) % 255;
+   I radius = 20;
+   I centerX = mpos.x; I centerY = mpos.y;
    for (int y = centerY - radius; y <= centerY + radius; y++) {
       for (int x = centerX - radius; x <= centerX + radius; x++) {
-         // Calculate the distance from the center of the disk (mpos) to the current point (x, y)
          int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
-
-         // Check if the current point is within the radius of the disk
          if (distanceSquared <= radius * radius) {
-            // Make sure the current point is within the bounds of the sand array
             if (x >= 0 && x < w&& y >= 0 && y < h) {
-               if(MKEYS[1]>0){ sand[getCellN(x,y)].colour = hsv_to_int(HsvToRgb(mcol,255,255)); }
-               if(MKEYS[3]>0){
-                  sand[getCellN(x,y)].colour = 0; // Set the color to RED
-               }
+               if(MKEYS[1]>0){ sand[gCellN(x,y)]->colour = hsv_to_int(HsvToRgb(mcol,255,255)); }
+               if(MKEYS[3]>0){ sand[gCellN(x,y)]->colour = 0; }
             }
          }
       }
    }
 }
-int t = 0;
-void sandTick(){
 
-   t++;
-   if(MKEYS[1] || MKEYS[3]){paint();}
-   int falldir = t % 2;
-   int x;
-   if(falldir==0){falldir=-1;}
-   for(int y = h-2; y >= 0; y--){
-      for(int xx = 0; xx < w ;xx++){
-         if (falldir == -1 ){x=(w-xx);}else{ x=xx;};
-         if(sand[getCellN(x,y)].colour!=0){
-            if(sand[getCellN(x,y+1)].colour==0){
-               sand[getCellN(x,y+1)]=sand[getCellN(x,y)];
-               sand[getCellN(x,y)].colour=0;
-            }else {
-               if(sand[getCellN(x,y+1)+falldir].colour==0){
-                  sand[getCellN(x,y+1)+falldir]=sand[getCellN(x,y)];
-                  sand[getCellN(x,y)].colour=0;
-               }else{
-                  sand[getCellN(x,y)]=sand[getCellN(x,y)];
-               }
-            }
-         }else {
-            sand[getCellN(x,y)].colour=0;
-
-         }
-      }
-   }
+void sandRender(Uint8 *p){
+   FORYX(h,w,{
+//      p[(x + y * w) * 4 + 0] = (int)(sand[gCellN(x,y)]->dy*10) ;         // Set blue component
+//      p[(x + y * w) * 4 + 1] = (int)(sand[gCellN(x,y)]->dy*10 );  // Set green component
+//      p[(x + y * w) * 4 + 2] = (int)(sand[gCellN(x,y)]->dy*10 ); // Set red component
+//      p[(x + y * w) * 4 + 3] = (sand[gCellN(x,y)]->colour >> 24) & 0xFF; // Set alpha component
+      p[(x + y * w) * 4 + 0] = (sand[gCellN(x,y)]->colour) & 0xFF;         // Set blue component
+      p[(x + y * w) * 4 + 1] = (sand[gCellN(x,y)]->colour >> 8) & 0xFF;  // Set green component
+      p[(x + y * w) * 4 + 2] = (sand[gCellN(x,y)]->colour >> 16) & 0xFF; // Set red component
+      p[(x + y * w) * 4 + 3] = (sand[gCellN(x,y)]->colour >> 24) & 0xFF; // Set alpha component
+   });
 }
+
 void sandInit(){
+   Wall = newCell(1, 100, 0, 0);
    addRenderFunction(sandRender);
    addTickFunction(sandTick);
-   for(int yy = 0; yy < h; yy++) {
-      for(int xx = 0; xx < w; xx++) {
-         sand[getCellN(xx,yy)].colour=0;
-         if(rand()%30<.01*yy-1){sand[getCellN(xx,yy)].colour = hsv_to_int(HsvToRgb(rand()%255,255,255)); } 
-      }
-   }
+   FORYX(h,w,{ sand[gCellN(x, y)]=newCell( (rand()%30<.01*y-1)? hsv_to_int(HsvToRgb(rand()%255,255,255)): 0 , 1 , 0, 0); });
 }

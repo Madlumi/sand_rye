@@ -1,8 +1,14 @@
+debug:
+	-mkdir out
+	gcc src/main.c `sdl2-config --cflags --libs ` -lSDL2_image -lm -o sand_ryedb -pg
+debrun: debug
+	./sand_ryedb
+
 linux:
 	-mkdir out
-	gcc src/main.c `sdl2-config --cflags --libs ` -lSDL2_image -lm -o i 
+	gcc src/main.c `sdl2-config --cflags --libs ` -lSDL2_image -lm -o sand_rye
 run: linux
-	./i
+	./sand_rye
 wasm:
 	-mkdir out
 	-mkdir build
