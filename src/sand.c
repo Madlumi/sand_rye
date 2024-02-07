@@ -22,18 +22,19 @@ I gCellN(I x, I y){
 }
 
 I empty(Cell *c){if(c->colour==0){return  1;} return  0; }
- 
+
 V paint();
 
 V swapCell(I a, I b){
    Cell tmp = sand[a];
-    sand[a] = sand[b];
-    sand[b] = tmp;
+   sand[a] = sand[b];
+   sand[b] = tmp;
 }
 F SPEED = 1.0/60.0;
 F G = 9.81; I t = 0; I mcol=0;
 I sign(int x) { return (x > 0) - (x < 0); }
 
+   I radius = 20;
 #define empt .colour==0
 #define nempt .colour!=0
 V cellTick(I c, I falldir){ 
@@ -42,7 +43,7 @@ V cellTick(I c, I falldir){
    I v = (int)sand[c].dy;
    I sig=sign(v);
    v*=sig;
-sand[c].sit=1;
+   sand[c].sit=1;
    F i=0;
    FOR(v,{
       int C =c+(w*i*sig);
@@ -52,39 +53,45 @@ sand[c].sit=1;
       if(sand[CN]empt){ swapCell(C, CN); }
       eif(sand[CN+falldir]empt ){ swapCell(C, CN+falldir);c+=falldir; }
       eif(sand[CN-falldir]empt ){ swapCell(C, CN-falldir);c-=falldir; }
-      eif(sand[CN].dy>=sand[C].dy){sand[C].dy= sand[CN].dy;}
+      eif(sand[CN].dy+G*SPEED >=sand[C].dy){sand[C].dy= sand[CN].dy;}
       eif(true){sand[C].dy*=.8; }
    })
 }
 
+I decay=1;
 V sandTick(){
-  if(MKEYS[1] || MKEYS[3]){paint();}
-  t++;
-  I falldir = t % 2; if(falldir==0){falldir=-1;}
-  I xx;
+   if(KEYS[SDLK_1]==2)decay=!decay;
+   radius+=mouseWheelMoved*2; mouseWheelMoved=0;
+   if(radius<2)radius=2;
+   if(radius>200)radius=200;
+
+   if(MKEYS[1] || MKEYS[3]){paint();}
+   t++;
+   I falldir = t % 2; if(falldir==0){falldir=-1;}
+   I xx;
    FOR(w*h, { sand[i].sit=0; }) 
 
+   if(decay){ FOR(h*w,{ if(rand()%1000==1)sand[i].colour=0; }) }
    FOR_RYX(h, w,  {
       xx = t%2 ?  x : w-(x) ;
 
       int i = xx+y*w;
       if(sand[i]nempt){ cellTick(i,1); }
    } )
-  // FORR(w*(h-1), {
-  //       if(sand[i]nempt){ cellTick(i,1); }
-  // });
+   // FORR(w*(h-1), {
+   //       if(sand[i]nempt){ cellTick(i,1); }
+   // });
 }
 
 V paint(){
    mcol=(mcol+1) % 255;
-   I radius = 20;
    I centerX = mpos.x; I centerY = mpos.y;
    for (int y = centerY - radius; y <= centerY + radius; y++) {
       for (int x = centerX - radius; x <= centerX + radius; x++) {
          int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
          if (distanceSquared <= radius * radius) {
             if (x >= 0 && x < w&& y >= 0 && y < h) {
-               if(MKEYS[1]>0 && sand[gCellN(x,y)]empt ){ sand[gCellN(x,y)] = newCell(hsv_to_int(HsvToRgb(mcol,255,255)), .1, 0,0); }
+               if(MKEYS[1]>0 && sand[gCellN(x,y)]empt ){ sand[gCellN(x,y)] = newCell(hsv_to_int(HsvToRgb(mcol,255,255)), .1, 0,2); }
                if(MKEYS[3]>0){ sand[gCellN(x,y)].colour = 0; }
             }
          }
