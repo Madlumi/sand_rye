@@ -1,3 +1,5 @@
+#ifndef MCOLOUR
+#define MCOLOUR
 typedef struct RgbColor
 {
     unsigned char r;
@@ -54,4 +56,4 @@ RgbColor HsvToRgb(int h, int s, int v){
     return rgb;
 }
 
-
+#endif
