@@ -1,5 +1,10 @@
+#include "SDL_mouse.h"
+#include <math.h>
 #include "SDL_rect.h"
+#include "SDL_stdinc.h"
 #include <SDL.h>
+#include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/ucontext.h>
 #ifdef __EMSCRIPTEN__
@@ -11,6 +16,7 @@
 
 #define IN(x,l,h) ((l)<=(x)&&(x)<=(h))
 #include<unistd.h>
+#define PI 3.14159265
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -24,15 +30,51 @@ int t = 0;
 bool KEYS[keyn];
 SDL_Point mpos = {0,0};
 int MKEYS[mkeyn];
-int sand[2][h][w];
-int timesteps=5;
-int st=0;
-int stN=1;
-void step(){
-   int t =st;
-   st = stN;
-   stN= t;
+int timesteps=1;
+int cellN=w*h;
+
+
+
+
+typedef struct{double x; double y;}force;
+typedef struct{
+   double v;
+   double r;
+   double d;
+   double el;
+   double x;
+   double y;
+   double mass;
+   force f;
+   int colour;
+} Cell;
+
+
+double get_angle(double F[2]) {
+    double angle = atan2(F[1], F[0]) * 180 / PI; // Convert radians to degrees
+    // Ensure the angle is between 0 and 360 degrees
+    if (angle < 0) {
+        angle += 360;
+    }
+    return angle;
 }
+
+Cell *cells[h*w];
+
+Cell *newCell(int col,double x, double y){
+   Cell *c =malloc(sizeof(Cell));
+   c->x=x;
+   c->y=y;
+   c->v=0;
+   c->d=0;
+   c->el=1;
+   c->r=2;
+   c->mass=.01;
+
+   c->colour=col;
+   return c;
+}
+double G=9.81;
 void render();
 
 void quit(){ SDL_Quit(); printf("quiting\n"); running=0; }
@@ -52,75 +94,78 @@ void events(){
       quit();  
    }
 }
+
    int linedir=-1;
 int mcol=0;
 void paint(){
-   mcol=(mcol+2) % 255;
-   int radius = 20;
-
-   int centerX = mpos.x;
-   int centerY = mpos.y;
-
-   for (int y = centerY - radius; y <= centerY + radius; y++) {
-      for (int x = centerX - radius; x <= centerX + radius; x++) {
-         // Calculate the distance from the center of the disk (mpos) to the current point (x, y)
-         int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
-
-         // Check if the current point is within the radius of the disk
-         if (distanceSquared <= radius * radius) {
-            // Make sure the current point is within the bounds of the sand array
-            if (x >= 0 && x < w&& y >= 0 && y < h) {
-               if(MKEYS[1]>0){ sand[st][y][x] = hsv_to_int(HsvToRgb(mcol,255,255)); }
-               if(MKEYS[3]>0){
-                  sand[st][y][x] = 0; // Set the color to RED
-               }
-            }
-         }
+   for(int i = 0; i < cellN; i++) {
+      if(cells[i]->colour==0){
+         cells[i]->x=mpos.x;
+         cells[i]->y=mpos.y;
+         cells[i]->r=rand()%10+1;
+         cells[i]->colour=hsv_to_int(HsvToRgb(mcol,255,255));
+         break;
       }
    }
 }
-void sandFall(){
-   int falldir = t % 2;
-   int x;
-   if(falldir==0){falldir=-1;}
-   for(int y = h-2; y >= 0; y--){
-      for(int xx = 0; xx < w ;xx++){
-         if (falldir == -1 ){x=(w-xx);}else{ x=xx;};
-         if(sand[st][y][x]!=0){
-            if(sand[st][y+1][x]==0){
-               sand[st][y+1][x]=sand[st][y][x];
-               sand[st][y][x]=0;
-            }else {
-               if(sand[st][y+1][x+falldir]==0){
-                  sand[st][y+1][x+falldir]=sand[st][y][x];
-                  sand[st][y][x]=0;
-               }else{
-                  sand[st][y][x]=sand[st][y][x];
-               }
-            }
-         }else {
-            sand[st][y][x]=0;
+Cell *ROOM;
+void grav(Cell *c){c->f.y+=c->mass*G;}
 
-         }
-      }
+void collide(Cell *c,Cell *hit){
+   double bounce = c->el* hit->el;
+   double mass = c->mass+hit->mass;
+   double yy =(c->f.y-hit->f.y)*bounce;
+   c->f.y=-yy;
+   hit->f.y=yy;
+}
+void move(Cell *c){
+   ROOM->f.y=0;
+   c->y+=c->f.y;
+   if(c->y>=h | c->y<=0){
+      collide(c,ROOM);
    }
 }
 void tick(){
+   for(int i = 0; i < cellN; i++) {
+      if(cells[i]->colour!=0){
+         grav(cells[i]);
+         move(cells[i]);
+      }
+   }
+   mcol=(mcol+10)%255;
    t+=1;
    if(MKEYS[1] || MKEYS[3]){paint();}
-   sandFall();
+}
+void setPix(Uint8 *pix, int x, int y, int c){
+        pix[(x + y * w) * 4 + 0] = (c & 0xFF);         // Set blue component
+        pix[(x + y * w) * 4 + 1] = (c >> 8) & 0xFF;  // Set green component
+        pix[(x + y * w) * 4 + 2] = (c >> 16) & 0xFF; // Set red component
+        pix[(x + y * w) * 4 + 3] = (c >> 24) & 0xFF; // Set alpha component
+}
+void renderCell(Uint8 * pix, Cell * c){
+   if(c->colour==0){return;}
+   //draw a circle with:
+   for (int i = c->x - c->r; i <= c->x + c->r; i++) {
+        for (int j = c->y - c->r; j <= c->y + c->r; j++) {
+            if ((i - c->x) * (i - c->x) + (j - c->y) * (j - c->y) <= c->r* c->r) {
+                if (i >= 0 && i < w && j >= 0 && j < h) {
+               setPix(pix ,i, j, c->colour );
+                }
+            }
+        }
+    }
+
+
 }
 void render(){
    if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
    Uint8 * pixels = surface->pixels;
 
-   for(int yy = 0; yy < h; yy++) {
-      for(int xx = 0; xx < w; xx++) {
-         pixels[(xx + yy * w) * 4 + 0] = sand[st][yy][xx] & 0xFF;         // Set blue component
-         pixels[(xx + yy * w) * 4 + 1] = (sand[st][yy][xx] >> 8) & 0xFF;  // Set green component
-         pixels[(xx + yy * w) * 4 + 2] = (sand[st][yy][xx] >> 16) & 0xFF; // Set red component
-         pixels[(xx + yy * w) * 4 + 3] = (sand[st][yy][xx] >> 24) & 0xFF; // Set alpha component
-      }
+   for (int i = 0; i<w*h*4;i++) {
+      pixels[i]=0;
+   }
+   for(int i = 0; i < cellN; i++) {
+      renderCell(pixels, cells[i]);
    }
    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
    
@@ -143,14 +188,11 @@ int main(int argc, char* argv[]) {
    SDL_CreateWindowAndRenderer(w, h, 0, &window, &renderer);
    surface = SDL_CreateRGBSurface(0, w , h, 32, 0, 0, 0, 0);
 
+      ROOM= newCell(0, 255,255);
+   ROOM->el=1;
    
-   for(int yy = 0; yy < h; yy++) {
-      for(int xx = 0; xx < w; xx++) {
-         int i = rand()%30;
-         sand[st][yy][xx]=0;
-         sand[stN][yy][xx]=0;
-         if(i<.01*yy-1){sand[st][yy][xx] = hsv_to_int(HsvToRgb(rand()%255,255,255)); } 
-      }
+   for(int i = 0; i < cellN; i++) {
+      cells[i]= newCell(0, 255,255);
    }
    for(int i = 0; i < 322; i++) { // init them all to false
       KEYS[i] = false;
