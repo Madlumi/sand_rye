@@ -10,16 +10,17 @@
 #include "keys.c"
 #include "tick.c"
 
+int running=1;
 void init(){
    keysInit();
-   renderInit();   
+   renderInit(512,512);   
    sandInit();
-}
 
-int running=1;
+   loadImg("res/test.png");
+}
 void quit(){
    SDL_Quit();
-   printf("quiting\n");
+   sandFree();
    running=0;
 }
 

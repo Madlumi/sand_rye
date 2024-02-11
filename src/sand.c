@@ -1,3 +1,4 @@
+#include "SDL_stdinc.h"
 #include "renderer.h"
 #include "keys.c"
 #include "tick.c"
@@ -6,8 +7,8 @@
 #include "mutil.h"
 
 
-typedef struct{ I colour; F mass;  F dy; I m; I sit;}Cell;
-Cell sand[w*h];
+typedef struct{ Uint32 colour; F mass;  F dy; I m; I sit;}Cell;
+Cell *sand;
 Cell newCell(I col, F mass, F dx, F dy){ 
    Cell c;
    c.m=0;
@@ -99,18 +100,35 @@ V paint(){
    }
 }
 
-void sandRender(Uint8 *p){
-   FORYX(h,w,{
-      p[(x + y * w) * 4 + 0] = (sand[gCellN(x,y)].colour) & 0xFF;         // Set blue component
-      p[(x + y * w) * 4 + 1] = (sand[gCellN(x,y)].colour >> 8) & 0xFF;  // Set green component
-      p[(x + y * w) * 4 + 2] = (sand[gCellN(x,y)].colour >> 16) & 0xFF; // Set red component
-      p[(x + y * w) * 4 + 3] = (sand[gCellN(x,y)].colour >> 24) & 0xFF; // Set alpha component
-   });
+void sandRender(Uint32 *p){ FORYX(h,w,{ p[(x + y * w)] = (sand[gCellN(x,y)].colour);   }); }
+
+V loadImg(char *img){
+   SDL_Surface* imgSurface = IMG_Load(img);
+   if (!imgSurface) {
+      fprintf(stderr, "Failed to load image: %s\n", IMG_GetError());
+      return;
+   }
+   imgSurfScaled= SDL_CreateRGBSurface(0, w, h, 32, 0, 0, 0, 0);
+   SDL_BlitScaled(imgSurface, NULL, imgSurfScaled, NULL);
+
+   Uint32 * imgPixels = (Uint32 *)imgSurfScaled->pixels;
+   int imgPitch = imgSurfScaled->pitch / sizeof(Uint32);
+   
+
+   SDL_FreeSurface(imgSurfScaled);
+   SDL_FreeSurface(imgSurface);
+
+   FORYX(h,w,{ sand[gCellN(x, y)]=newCell( imgPixels[x+y* imgPitch] , 1 , 0, 0); });
 }
 
-void sandInit(){
+V sandInit(){
+   sand = malloc(sizeof(Cell)*w*h);
    Wall = newCell(1, 100, 0, 0);
    addRenderFunction(sandRender);
    addTickFunction(sandTick);
-   FORYX(h,w,{ sand[gCellN(x, y)]=newCell( (rand()%30<.01*y-1)? hsv_to_int(HsvToRgb(rand()%255,255,255)): 0 , 1 , 0, 0); });
+   FORYX(h,w,{ sand[gCellN(x, y)]=newCell( 0  , 1 , 0, 0); });
+}
+
+V sandFree(){
+   free(sand);
 }
