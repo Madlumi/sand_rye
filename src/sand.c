@@ -2,9 +2,12 @@
 #include "renderer.h"
 #include "keys.c"
 #include "tick.c"
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include "mutil.h"
+#include <SDL.h>
+#include <SDL_image.h>
 
 
 typedef struct{ Uint32 colour; F mass;  F dy; I m; I sit;}Cell;
@@ -84,6 +87,8 @@ V sandTick(){
    // });
 }
 
+Uint32 * imgPixels;
+int imgPitch;
 V paint(){
    mcol=(mcol+1) % 255;
    I centerX = mpos.x; I centerY = mpos.y;
@@ -92,7 +97,7 @@ V paint(){
          int distanceSquared = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
          if (distanceSquared <= radius * radius) {
             if (x >= 0 && x < w&& y >= 0 && y < h) {
-               if(MKEYS[1]>0 && sand[gCellN(x,y)]empt ){ sand[gCellN(x,y)] = newCell(hsv_to_int(HsvToRgb(mcol,255,255)), .1, 0,2); }
+               if(MKEYS[1]>0 && sand[gCellN(x,y)]empt ){ sand[gCellN(x,y)] = newCell(  imgPixels[x+y* imgPitch], .1, 0,2); }
                if(MKEYS[3]>0){ sand[gCellN(x,y)].colour = 0; }
             }
          }
@@ -101,9 +106,9 @@ V paint(){
 }
 
 void sandRender(Uint32 *p){ FORYX(h,w,{ p[(x + y * w)] = (sand[gCellN(x,y)].colour);   }); }
-
 V loadImg(char *img){
    SDL_Surface* imgSurface = IMG_Load(img);
+   printf("uwu\n");
    if (!imgSurface) {
       fprintf(stderr, "Failed to load image: %s\n", IMG_GetError());
       return;
@@ -111,12 +116,12 @@ V loadImg(char *img){
    imgSurfScaled= SDL_CreateRGBSurface(0, w, h, 32, 0, 0, 0, 0);
    SDL_BlitScaled(imgSurface, NULL, imgSurfScaled, NULL);
 
-   Uint32 * imgPixels = (Uint32 *)imgSurfScaled->pixels;
-   int imgPitch = imgSurfScaled->pitch / sizeof(Uint32);
+   imgPixels = (Uint32 *)imgSurfScaled->pixels;
+   imgPitch = imgSurfScaled->pitch / sizeof(Uint32);
    
 
-   SDL_FreeSurface(imgSurfScaled);
-   SDL_FreeSurface(imgSurface);
+ //  SDL_FreeSurface(imgSurfScaled);
+ //  SDL_FreeSurface(imgSurface);
 
    FORYX(h,w,{ sand[gCellN(x, y)]=newCell( imgPixels[x+y* imgPitch] , 1 , 0, 0); });
 }
