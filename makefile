@@ -11,13 +11,17 @@ run: linux
 	./sand_rye
 wasm:
 	-mkdir out
-	-mkdir build
-	emcc src/main.c -o build/index.html -s USE_SDL=2 -s NO_EXIT_RUNTIME=1 -s NO_FILESYSTEM=1 
-	#emcc -c src/main.c -o build/app.o -s USE_SDL=2
-	#emcc build/app.o -o build/index.html -s USE_SDL=2
-
-web: wasm
-	sudo cp build/index.html build/index.js build/index.wasm /var/www/html/
+	-mkdir web_out
+	emcc src/main.c  --shell-file src/web/base.html   -s USE_SDL=2 -s USE_SDL_IMAGE=2 -lSDL --preload-file res -s ALLOW_MEMORY_GROWTH=1 -s SDL2_IMAGE_FORMATS='["png"]' -o web_out/sandi.html
+local: wasm
+	sudo cp -r web_out/*  /var/www/html/
+website: wasm
+	##super hardcoded deployment pipeline be like
+	sudo cp -r web_out/*html ../Website/pages/
+	sudo cp -r web_out/*js ../Website/raw/
+	sudo cp -r web_out/*wasm ../Website/raw/
+	sudo cp -r web_out/*data ../Website/raw/
+	
 compilecmd: clean 
 	bear -- make
 clean:
